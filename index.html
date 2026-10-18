@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BL Animator Mobile</title>
+  <style>
+    :root {
+      --bg: #121215;
+      --panel: #1e1e24;
+      --border: #333;
+      --text: #e0e0e0;
+      --accent: #6366f1;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 8px;
+      user-select: none;
+    }
+    .wrapper { max-width: 100%; }
+    h1 { text-align: center; font-size: 1.3rem; margin-bottom: 12px; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      background: var(--panel);
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    label { font-size: 0.9rem; }
+    input[type="color"] { border: none; cursor: pointer; }
+
+    button {
+      padding: 8px 14px;
+      cursor: pointer;
+      border: 1px solid #444;
+      background: transparent;
+      color: white;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+    button.primary {
+      background: var(--accent);
+      border: none;
+      width: 100%;
+      margin-top: 8px;
+    }
+
+    select, input[type="url"] {
+      padding: 8px;
+      background: #2a2a30;
+      color: white;
+      border: 1px solid #444;
+      border-radius: 6px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .grid-container {
+      display: grid;
+      grid-template-columns: repeat(16, 40px);
+      grid-template-rows: repeat(16, 40px);
+      gap: 2px;
+      background: var(--border);
+      width: fit-content;
+      margin: auto;
+    }
+    .pixel {
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+      transition: transform 0.05s;
+    }
+    .pixel:active { transform: scale(0.95); }
+
+    .send-panel {
+      margin-top: 16px;
+      background: var(--panel);
+      padding: 14px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    #status {
+      min-height: 22px;
+      font-weight: 600;
+      text-align: center;
+      margin-top: 8px;
+    }
+    .success { color: #4ade80; }
+    .error { color: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <h1>BL Animator (Mobile)</h1>
+
+    <div class="toolbar">
+      <label>Цвет: <input type="color" id="colorPicker" value="#FFFFFF"></label>
+      <button id="btnAddFrame">+ Кадр</button>
+      <select id="frameSelector"></select>
+      <button id="btnDeleteFrame">Удалить кадр</button>
+    </div>
+
+    <div id="gridContainer" class="grid-container"></div>
+
+    <div class="send-panel">
+      <input type="url" id="targetUrl" placeholder="URL HTTP передатчика (Build Logic)" style="width:100%; padding:8px; margin-bottom:8px;">
+      <button id="sendBtn" class="primary">🚀 Отправить в Build Logic</button>
+      <div id="status"></div>
+    </div>
+  </div>
+
+  <script>
+    const SIZE = 16;
+    let frames = ;
+    let currentFrameIndex = 0;
+
+    const gridContainer = document.getElementById('gridContainer');
+    const colorPicker = document.getElementById('colorPicker');
+    const frameSelector = document.getElementById('frameSelector');
+    const btnAddFrame = document.getElementById('btnAddFrame');
+    const btnDeleteFrame = document.getElementById('btnDeleteFrame');
+    const targetUrl = document.getElementById('targetUrl');
+    const sendBtn = document.getElementById('sendBtn');
+    const status = document.getElementById('status');
+
+    function createEmptyFrame() {
+      const frame = ;
+      for (let y = 0; y < SIZE; y++) {
+        const row = ;
+        for (let x = 0; x < SIZE; x++) {
+          row.push([0, 0, 0]);
+        }
+        frame.push(row);
+      }
+      return frame;
+    }
+
+    function init() {
+      addFrame();
+      renderGrid();
+      updateFrameSelector();
+    }
+
+    function addFrame() {
+      frames.push(createEmptyFrame());
+      currentFrameIndex = frames.length - 1;
+      renderGrid();
+      updateFrameSelector();
+    }
+
+    function deleteFrame() {
+      if (frames.length <= 1) {
+        showStatus('Нужен хотя бы 1 кадр', 'error');
+        return;
+      }
+      frames.splice(currentFrameIndex, 1);
+      currentFrameIndex = Math.max(0, currentFrameIndex - 1);
+      renderGrid();
+      updateFrameSelector();
+      showStatus('');
+    }
+
+    function updateFrameSelector() {
+      frameSelector.innerHTML = '';
+      frames.forEach((_, i) => {
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = `Кадр \${i + 1}`;
+        if (i === currentFrameIndex) option.selected = true;
+        frameSelector.appendChild(option);
+      });
+    }
+
+    function renderGrid() {
+      gridContainer.innerHTML = '';
+      const currentFrame = frames[currentFrameIndex];
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          const pixel = document.createElement('div');
+          pixel.className = 'pixel';
+          const [r, g, b] = currentFrame[y][x];
+          pixel.style.backgroundColor = `rgb(${r},${g},\${b})`;
+          pixel.onclick = () => {
+            const hex = colorPicker.value;
+            const c = hexToRgb(hex);
+            currentFrame[y][x] = c;
+            pixel.style.backgroundColor = hex;
+          };
+          gridContainer.appendChild(pixel);
+        }
+      }
+    }
+
+    function hexToRgb(hex) {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})\$/i.exec(hex);
+      if (!result) return [0, 0, 0];
+      return [
+        parseInt(result, 16),
+        parseInt(result, 16),
+        parseInt(result, 16)
+      ];
+    }
+
+    btnAddFrame.onclick = addFrame;
+    btnDeleteFrame.onclick = deleteFrame;
+
+    frameSelector.onchange = (e) => {
+      currentFrameIndex = parseInt(e.target.value, 10);
+      renderGrid();
+    };
+
+    sendBtn.onclick = async () => {
+      const url = targetUrl.value.trim();
+      if (!url) {
+        showStatus('Вставь URL HTTP передатчика', 'error');
+        return;
+      }
+
+      const payload = {
+        frames: frames.map(frame =>
+          frame.map(row => row.map(pixel => [...pixel]))
+        )
+      };
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          showStatus('Отправлено в Build Logic!', 'success');
+        } else {
+          const text = await res.text();
+          showStatus(`Ошибка сервера: ${res.status} — ${text.substring(0, 150)}`, 'error');
+        }
+      } catch (e) {
+        showStatus(`Ошибка сети: \${e.message}`, 'error');
+      }
+    };
+
+    function showStatus(msg, type) {
+      status.textContent = msg;
+      status.className = type ? type : '';
+    }
+
+    init();
+  </script>
+</body>
+</html>
