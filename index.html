@@ -12,6 +12,7 @@
       --text: #e0e0e0;
       --accent: #6366f1;
     }
+
     body {
       background: var(--bg);
       color: var(--text);
@@ -20,8 +21,8 @@
       padding: 8px;
       user-select: none;
     }
+
     .wrapper { max-width: 100%; }
-    h1 { text-align: center; font-size: 1.3rem; margin-bottom: 12px; }
 
     .toolbar {
       display: flex;
@@ -31,36 +32,27 @@
       background: var(--panel);
       padding: 10px;
       border-radius: 8px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
-
-    label { font-size: 0.9rem; }
-    input[type="color"] { border: none; cursor: pointer; }
 
     button {
       padding: 8px 14px;
       cursor: pointer;
-      border: 1px solid #444;
+      border: 1px solid var(--border);
       background: transparent;
       color: white;
       border-radius: 6px;
       font-size: 0.85rem;
-    }
-    button.primary {
-      background: var(--accent);
-      border: none;
-      width: 100%;
-      margin-top: 8px;
+      transition: background 0.2s;
     }
 
-    select, input[type="url"] {
-      padding: 8px;
-      background: #2a2a30;
-      color: white;
-      border: 1px solid #444;
-      border-radius: 6px;
-      width: 100%;
-      box-sizing: border-box;
+    button:hover {
+      background: var(--border);
+    }
+
+    button.active {
+      background: var(--accent);
+      border-color: var(--accent);
     }
 
     .grid-container {
@@ -72,48 +64,53 @@
       width: fit-content;
       margin: auto;
     }
-    .pixel {
+
+    .cell {
       width: 100%;
       height: 100%;
       cursor: pointer;
-      transition: transform 0.05s;
+      transition: transform 0.05s, background 0.2s;
+      background-color: #1a1a1a;
     }
-    .pixel:active { transform: scale(0.95); }
 
-    .send-panel {
-      margin-top: 16px;
-      background: var(--panel);
-      padding: 14px;
-      border-radius: 8px;
-      text-align: center;
+    .cell:hover {
+      transform: scale(0.98);
+      background-color: #333;
     }
-    #status {
-      min-height: 22px;
-      font-weight: 600;
+
+    #typewriter-view {
+      display: none;
       text-align: center;
-      margin-top: 8px;
+      margin-top: 20px;
     }
-    .success { color: #4ade80; }
-    .error { color: #f87171; }
+
+    textarea {
+      width: 100%;
+      background: #2a2a30;
+      color: white;
+      border: 1px solid #444;
+      padding: 10px;
+      border-radius: 6px;
+      box-sizing: border-box;
+      resize: vertical;
+      min-height: 100px;
+    }
   </style>
 </head>
 <body>
   <div class="wrapper">
-    <h1>BL Animator (Mobile)</h1>
-
     <div class="toolbar">
-      <label>Цвет: <input type="color" id="colorPicker" value="#FFFFFF"></label>
-      <button id="btnAddFrame">+ Кадр</button>
-      <select id="frameSelector"></select>
-      <button id="btnDeleteFrame">Удалить кадр</button>
+      <button onclick="switchMode('animator')" id="btn-animator" class="active">Animator (Сетка)</button>
+      <button onclick="switchMode('typewriter')">Typewriter</button>
     </div>
 
-    <div id="gridContainer" class="grid-container"></div>
+    <div id="animator-view">
+      <div class="grid-container" id="grid"></div>
+    </div>
 
-    <div class="send-panel">
-      <input type="url" id="targetUrl" placeholder="URL HTTP передатчика (Build Logic)" style="width:100%; padding:8px; margin-bottom:8px;">
-      <button id="sendBtn" class="primary">🚀 Отправить в Build Logic</button>
-      <div id="status"></div>
+    <div id="typewriter-view">
+      <textarea id="tw-input" placeholder="Введи текст..."></textarea>
+      <div id="tw-output" style="margin-top: 10px; color: #aaa;"></div>
     </div>
   </div>
 
@@ -122,137 +119,46 @@
     let frames = ;
     let currentFrameIndex = 0;
 
-    const gridContainer = document.getElementById('gridContainer');
-    const colorPicker = document.getElementById('colorPicker');
-    const frameSelector = document.getElementById('frameSelector');
-    const btnAddFrame = document.getElementById('btnAddFrame');
-    const btnDeleteFrame = document.getElementById('btnDeleteFrame');
-    const targetUrl = document.getElementById('targetUrl');
-    const sendBtn = document.getElementById('sendBtn');
-    const status = document.getElementById('status');
+    function init() {
+      frames = [createEmptyFrame()];
+      renderGrid();
+    }
 
     function createEmptyFrame() {
-      const frame = ;
-      for (let y = 0; y < SIZE; y++) {
-        const row = ;
-        for (let x = 0; x < SIZE; x++) {
-          row.push([0, 0, 0]);
-        }
-        frame.push(row);
-      }
-      return frame;
-    }
-
-    function init() {
-      addFrame();
-      renderGrid();
-      updateFrameSelector();
-    }
-
-    function addFrame() {
-      frames.push(createEmptyFrame());
-      currentFrameIndex = frames.length - 1;
-      renderGrid();
-      updateFrameSelector();
-    }
-
-    function deleteFrame() {
-      if (frames.length <= 1) {
-        showStatus('Нужен хотя бы 1 кадр', 'error');
-        return;
-      }
-      frames.splice(currentFrameIndex, 1);
-      currentFrameIndex = Math.max(0, currentFrameIndex - 1);
-      renderGrid();
-      updateFrameSelector();
-      showStatus('');
-    }
-
-    function updateFrameSelector() {
-      frameSelector.innerHTML = '';
-      frames.forEach((_, i) => {
-        const option = document.createElement('option');
-        option.value = i;
-        option.textContent = `Кадр \${i + 1}`;
-        if (i === currentFrameIndex) option.selected = true;
-        frameSelector.appendChild(option);
-      });
+      return Array.from({ length: SIZE }, () => Array(SIZE).fill('#1a1a1a'));
     }
 
     function renderGrid() {
+      const gridContainer = document.getElementById('grid');
       gridContainer.innerHTML = '';
+      
       const currentFrame = frames[currentFrameIndex];
+
       for (let y = 0; y < SIZE; y++) {
         for (let x = 0; x < SIZE; x++) {
           const pixel = document.createElement('div');
-          pixel.className = 'pixel';
-          const [r, g, b] = currentFrame[y][x];
-          pixel.style.backgroundColor = `rgb(${r},${g},\${b})`;
+          pixel.className = 'cell';
+          pixel.style.backgroundColor = currentFrame[y][x];
+          
           pixel.onclick = () => {
-            const hex = colorPicker.value;
-            const c = hexToRgb(hex);
-            currentFrame[y][x] = c;
-            pixel.style.backgroundColor = hex;
+            const hex = prompt('Введите цвет (hex, например #FF0000):', currentFrame[y][x]);
+            if (hex) {
+              currentFrame[y][x] = hex;
+              pixel.style.backgroundColor = hex;
+            }
           };
+          
           gridContainer.appendChild(pixel);
         }
       }
     }
 
-    function hexToRgb(hex) {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})\$/i.exec(hex);
-      if (!result) return [0, 0, 0];
-      return [
-        parseInt(result, 16),
-        parseInt(result, 16),
-        parseInt(result, 16)
-      ];
-    }
-
-    btnAddFrame.onclick = addFrame;
-    btnDeleteFrame.onclick = deleteFrame;
-
-    frameSelector.onchange = (e) => {
-      currentFrameIndex = parseInt(e.target.value, 10);
-      renderGrid();
-    };
-
-    sendBtn.onclick = async () => {
-      const url = targetUrl.value.trim();
-      if (!url) {
-        showStatus('Вставь URL HTTP передатчика', 'error');
-        return;
-      }
-
-      const payload = {
-        frames: frames.map(frame =>
-          frame.map(row => row.map(pixel => [...pixel]))
-        )
-      };
-
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-          showStatus('Отправлено в Build Logic!', 'success');
-        } else {
-          const text = await res.text();
-          showStatus(`Ошибка сервера: ${res.status} — ${text.substring(0, 150)}`, 'error');
-        }
-      } catch (e) {
-        showStatus(`Ошибка сети: \${e.message}`, 'error');
-      }
-    };
-
-    function showStatus(msg, type) {
-      status.textContent = msg;
-      status.className = type ? type : '';
+    function switchMode(mode) {
+      document.getElementById('animator-view').style.display = mode === 'animator' ? 'block' : 'none';
+      document.getElementById('typewriter-view').style.display = mode === 'typewriter' ? 'block' : 'none';
+      
+      document.querySelectorAll('.toolbar button').forEach(b => b.classList.remove('active'));
+      event.target.classList.add('active');
     }
 
     init();
